@@ -7,9 +7,9 @@ import Data.Word
 import Control.Monad
 
 l :: [Word8]
-l = [1..250]
+l = [3..250]
 
-f :: [SBV Word8] -> [SBV Word8]
+f :: Num a => [a] -> [a]
 f [] = []
 f [x] = [x]
 f (x:xs) = [x+5*(head xs)] ++ f xs
