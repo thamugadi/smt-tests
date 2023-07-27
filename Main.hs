@@ -1,10 +1,12 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
+module Main where
 
 import Data.SBV
 import Data.Word
 import Control.Monad
+import Lib 
 
 l :: [Word8]
 l = [3..250]
@@ -14,28 +16,22 @@ f [] = []
 f [x] = [x]
 f (x:xs) = [x+5*(head xs)] ++ f xs
 
-constrIterM :: (a -> a) -> Symbolic a -> Int -> (a -> SBool) -> Symbolic ()
-constrIterM f arg n constr = arg >>= (\a -> constrIter f a n constr)
+g :: (Num a, Mergeable a, EqSymbolic a) => (a, [a]) -> (a, [a])
+g (r,m) = ite (r .== 0) (1, m) $
+          ite (r ./= 0) (0, m) $
+          (r,m)
 
-constrIter :: (a -> a) -> a -> Int -> (a -> SBool) -> Symbolic ()
-constrIter f arg n constr = let iterations = take n (iterate f arg) in do
-    mapM_ softConstrain $ (map constr iterations)
-
-symList :: SymVal a => [Int] -> [a] -> Symbolic [SBV a]
-symList indexes list = do
-    vars <- replicateM (length indexes) (free "SYL")
-    return $ 
-      foldl
-        (\acc (idx, val)
-          -> take idx acc ++ val : drop (idx + 1) acc) (map literal list) (zip indexes vars)
-
-search :: IO ()
+search :: IO SatResult 
 search = do
-  result <- sat $ do
+  sat $ do
     let list = symList [0,1] l
     let cond = \x -> x !! 5 .== 10 .&& x !! 4 .> 1
-    constrIterM f list 300 cond 
-  print result
+    constrIterM f list 10 cond
+    let cond2 = \(x,y) -> x .== 0
+    let mach = symMach [0..100]
+    constrIterM (g @SWord8) mach 5 cond2
 
 main :: IO ()
-main = search
+main = do
+  res <- search
+  print res
