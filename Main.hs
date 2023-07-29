@@ -6,32 +6,32 @@ module Main where
 import Data.SBV
 import Data.Word
 import Control.Monad
-import Lib 
-
-l :: [Word8]
-l = [3..250]
-
-f :: Num a => [a] -> [a]
-f [] = []
-f [x] = [x]
-f (x:xs) = [x+5*(head xs)] ++ f xs
+import Lib
 
 g :: (Num a, Mergeable a, EqSymbolic a) => (a, [a]) -> (a, [a])
 g (r,m) = ite (r .== 0) (1, m) $
           ite (r ./= 0) (0, m) $
           (r,m)
 
-search :: IO SatResult 
-search = do
+g_inputs :: (Num a, Mergeable a, EqSymbolic a) => [a] -> Int -> (a, [a]) -> (a, [a])
+g_inputs [] 0 (c, m) = (c, m)
+g_inputs (i:is) 0 (c,m) =
+  ite (m !! 0x40 .== 0) (g_inputs (i:is) 0 (g (c, m))) $ (g_inputs (i:is) 1 (g (i, m)))
+g_inputs (i:is) 1 (c,m) =
+  ite (m !! 0x40 .== 0) (g_inputs is 2 (g (i, m))) $ (g_inputs (i:is) 1 (g (i, m)))
+g_inputs (i:is) 2 (c,m) = g_inputs (i:is) 0 (c,m)
+
+g_inputs_ :: (Num a, Mergeable a, EqSymbolic a) => [a] -> (a, [a]) -> (a, [a])
+g_inputs_ = (\x y -> g_inputs x 0 y)
+
+search_g :: IO SatResult
+search_g = do
   sat $ do
-    let list = symList [0,1] l
-    let cond = \x -> x !! 5 .== 10 .&& x !! 4 .> 1
-    constrIterM f list 10 cond
-    let cond2 = \(x,y) -> x .== 0
-    let mach = symMach [0..100]
-    constrIterM (g @SWord8) mach 5 cond2
+    let list = symList [0..5] (take 5 $ repeat 0)
+    list >>=
+      (\x -> 
+        constrain (((snd $ (g_inputs_ @(SBV Word8)) x (0, take 200 $ repeat 0)) !! 120) .== 1))
 
 main :: IO ()
 main = do
-  res <- search
-  print res
+  print 1 
